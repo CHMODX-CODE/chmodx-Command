@@ -17,12 +17,12 @@ chmodx-Command es un programa educativo interactivo creado para enseñar comando
 
 ### Instalación rápida:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/usuario/chmodx-Command/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/CHMODX-CODE/chmodx-Command/main/install.sh | bash
 ```
 
 ### Instalación manual:
 ```bash
-git clone https://github.com/usuario/chmodx-Command.git
+git clone https://github.com/CHMODX-CODE/chmodx-Command.git
 cd chmodx-Command
 bash install.sh
 ```

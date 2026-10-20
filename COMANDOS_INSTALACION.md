@@ -5,20 +5,20 @@
 Ejecuta este comando en Termux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/usuario/chmodx-Command/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/CHMODX-CODE/chmodx-Command/main/install.sh | bash
 ```
 
 ## Alternativas de Instalación
 
 ### Opción 1: Con wget
 ```bash
-wget -O install.sh https://raw.githubusercontent.com/usuario/chmodx-Command/main/install.sh
+wget -O install.sh https://raw.githubusercontent.com/CHMODX-CODE/chmodx-Command/main/install.sh
 bash install.sh
 ```
 
 ### Opción 2: Git clone
 ```bash
-git clone https://github.com/usuario/chmodx-Command.git
+git clone https://github.com/CHMODX-CODE/chmodx-Command.git
 cd chmodx-Command
 bash install.sh
 ```
@@ -26,7 +26,7 @@ bash install.sh
 ### Opción 3: Instalación manual
 ```bash
 # Descargar
-wget https://github.com/usuario/chmodx-Command/archive/main.zip
+wget https://github.com/CHMODX-CODE/chmodx-Command/archive/main.zip
 unzip main.zip
 
 # Instalar dependencias Python

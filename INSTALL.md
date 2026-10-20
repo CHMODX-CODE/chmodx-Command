@@ -5,7 +5,7 @@
 Ejecuta este comando en tu Termux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/chmodx-Command/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/CHMODX-CODE/chmodx-Command/main/install.sh | bash
 ```
 
 ## Instalación manual paso a paso
