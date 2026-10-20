@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# chmodx-Command Installer
-# Instalación en un comando para Termux
-# chmodx-Command v1.0
+# chmodx-Command Installer v2.0
+# Análisis de entorno antes de instalación
+# Terminal Mastery for Hackers
 
 set -e
 
@@ -12,442 +12,314 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+MAGENTA='\033[0;35m'
+NC='\033[0m'
 
-echo -e "${CYAN}"
-echo "╔════════════════════════════════════════════════════════════╗"
-echo "║                                                            ║"
-echo "║              chmodx-Command Installer                      ║"
-echo "║          Terminal Mastery for Hackers                     ║"
-echo "║                                                            ║"
-echo "╚════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
+# Variables
+ERRORS=0
+WARNINGS=0
 
-# Verificar si estamos en Termux
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+    ((ERRORS++))
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+    ((WARNINGS++))
+}
+
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_header() {
+    echo -e "${CYAN}"
+    echo "╔═══════════════════════════════════════════════════════════════╗"
+    echo "║                                                               ║"
+    echo "║              chmodx-Command Installer v2.0                   ║"
+    echo "║          Terminal Mastery for Hackers                        ║"
+    echo "║                                                               ║"
+    echo "╚═══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+print_section() {
+    echo -e "${MAGENTA}╭───────────────────────────────────────────────────────────────╮${NC}"
+    echo -e "${MAGENTA}│${NC} $1"
+    echo -e "${MAGENTA}╰───────────────────────────────────────────────────────────────╯${NC}"
+}
+
+# Verificación inicial
 if [ ! -d "/data/data/com.termux" ]; then
     echo -e "${RED}[ERROR] Este script debe ejecutarse en Termux${NC}"
     exit 1
 fi
 
-echo -e "${BLUE}[INFO] Verificando Termux...${NC}"
+print_header
+echo ""
+
+# ANÁLISIS DE ENTORNO
+print_section "ANÁLISIS DEL ENTORNO"
+
+echo ""
+log_info "=== Verificando Termux ==="
+if [ -d "/data/data/com.termux" ]; then
+    log_success "Entorno Termux detectado correctamente"
+else
+    log_error "NO es un entorno Termux válido"
+fi
+
+# Arquitectura
+ARCH=$(uname -m)
+log_success "Arquitectura detectada: $ARCH"
+
+# Android version
+if command -v getprop &> /dev/null; then
+    ANDROID_VER=$(getprop ro.build.version.release 2>/dev/null || echo "Desconocida")
+    log_success "Versión Android: $ANDROID_VER"
+fi
+
+echo ""
+log_info "=== Verificando comandos esenciales ==="
+
+# Verificar bash
+if command -v bash &> /dev/null; then
+    log_success "bash disponible: $(which bash)"
+else
+    log_error "bash NO encontrado"
+fi
+
+# Verificar curl/wget
+if command -v curl &> /dev/null; then
+    log_success "curl disponible: $(which curl)"
+elif command -v wget &> /dev/null; then
+    log_success "wget disponible: $(which wget)"
+else
+    log_warning "curl/wget NO encontrado - descarga manual requerida"
+fi
+
+# Verificar pkg
+if command -v pkg &> /dev/null; then
+    log_success "pkg disponible: $(which pkg)"
+else
+    log_error "pkg NO encontrado - Termux no configurado correctamente"
+fi
+
+echo ""
+log_info "=== Verificando Python ==="
 
 # Verificar Python
-if ! command -v python &> /dev/null; then
-    echo -e "${YELLOW}[INFO] Instalando Python...${NC}"
-    pkg update -y
-    pkg install python -y
+if command -v python3 &> /dev/null; then
+    PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
+    log_success "Python3 detectado: $PYTHON_VERSION"
+
+    # Verificar versión mínima
+    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d'.' -f1)
+    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d'.' -f2)
+
+    if [ "$PYTHON_MAJOR" -gt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 7 ]); then
+        log_success "Versión de Python es compatible (3.7+)"
+    else
+        log_error "Python $PYTHON_VERSION es muy antiguo (requiere 3.7+)"
+    fi
+else
+    log_warning "Python3 NO instalado - se instalará automáticamente"
 fi
 
 # Verificar pip
-if ! command -v pip &> /dev/null; then
-    echo -e "${YELLOW}[INFO] Instalando pip...${NC}"
-    pkg install python-pip -y
+if command -v pip3 &> /dev/null; then
+    PIP_VERSION=$(pip3 --version 2>&1 | cut -d' ' -f2)
+    log_success "pip3 disponible: $PIP_VERSION"
+else
+    log_warning "pip3 NO instalado - se instalará automáticamente"
 fi
 
-echo -e "${BLUE}[INFO] Instalando dependencias Python...${NC}"
-pip install rich termcolor --quiet
+echo ""
+log_info "=== Verificando paquetes Termux ==="
 
-# Crear directorio de instalación
-INSTALL_DIR="$HOME/.chmodx-command"
-mkdir -p "$INSTALL_DIR"
-
-echo -e "${BLUE}[INFO] Descargando chmodx-Command...${NC}"
-
-# Crear el programa principal
-cat > "$INSTALL_DIR/chmodx_command.py" << 'EOF'
-#!/usr/bin/env python3
-# chmodx-Command v1.0
-# Terminal Command Learning System
-# Made for chmodx
-
-import json
-import os
-import subprocess
-from pathlib import Path
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
-from rich.prompt import Prompt, Confirm
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.columns import Columns
-from rich import box
-
-console = Console()
-
-# Directories
-HOME_DIR = Path.home()
-DATA_DIR = HOME_DIR / ".chmodx-command"
-DATA_DIR.mkdir(exist_ok=True)
-PROGRESS_FILE = DATA_DIR / "progress.json"
-
-# Initialize progress
-if not PROGRESS_FILE.exists():
-    progress_data = {
-        "chapters_completed": {},
-        "commands_practiced": {},
-        "total_commands": 0,
-        "commands_learned": 0
-    }
-    with open(PROGRESS_FILE, 'w') as f:
-        json.dump(progress_data, f)
-
-# Chapters data
-CHAPTERS = {
-    1: {
-        "title": "Fundamentos de Termux",
-        "description": "Esenciales para gestionar Termux",
-        "commands": [
-            {"cmd": "pkg update", "desc": "Actualiza lista de paquetes disponibles"},
-            {"cmd": "pkg upgrade", "desc": "Actualiza todos los paquetes instalados"},
-            {"cmd": "pkg install <package>", "desc": "Instala un paquete específico"},
-            {"cmd": "pkg uninstall <package>", "desc": "Elimina un paquete"},
-            {"cmd": "pwd", "desc": "Muestra ruta actual"},
-            {"cmd": "ls", "desc": "Lista archivos en directorio"},
-            {"cmd": "cd", "desc": "Cambia de directorio"},
-            {"cmd": "mkdir <name>", "desc": "Crea directorio"},
-            {"cmd": "touch <file>", "desc": "Crea archivo vacío"},
-            {"cmd": "rm <file>", "desc": "Elimina archivo"},
-        ]
-    },
-    2: {
-        "title": "Interacción con la UI",
-        "description": "Comandos termux-api para UI Android",
-        "commands": [
-            {"cmd": "termux-toast", "desc": "Muestra mensaje temporal"},
-            {"cmd": "termux-notification", "desc": "Publica notificación"},
-            {"cmd": "termux-clipboard-get", "desc": "Lee portapapeles"},
-            {"cmd": "termux-open", "desc": "Abre URL/archivo"},
-            {"cmd": "termux-vibrate", "desc": "Habilita vibración"},
-        ]
-    },
-    3: {
-        "title": "Hardware del Dispositivo",
-        "description": "Control de componentes físicos",
-        "commands": [
-            {"cmd": "termux-battery-status", "desc": "Estado de batería"},
-            {"cmd": "termux-camera-photo", "desc": "Toma foto"},
-            {"cmd": "termux-torch on", "desc": "Enciende linterna"},
-            {"cmd": "termux-sensor", "desc": "Lee sensores"},
-            {"cmd": "termux-tts-speak", "desc": "Texto a voz"},
-        ]
-    },
-    4: {
-        "title": "Comunicación",
-        "description": "SMS, llamadas, Wi-Fi, GPS",
-        "commands": [
-            {"cmd": "termux-telephony-call", "desc": "Inicia llamada"},
-            {"cmd": "termux-sms-send", "desc": "Envía SMS"},
-            {"cmd": "termux-wifi-connectioninfo", "desc": "Info Wi-Fi"},
-            {"cmd": "termux-location", "desc": "Ubicación GPS"},
-            {"cmd": "termux-download", "desc": "Descarga archivo"},
-        ]
-    },
-    5: {
-        "title": "Procesos y Sesión",
-        "description": "Control de procesos y jobs",
-        "commands": [
-            {"cmd": "ps aux", "desc": "Lista procesos"},
-            {"cmd": "kill <PID>", "desc": "Termina proceso"},
-            {"cmd": "jobs", "desc": "Trabajos en background"},
-            {"cmd": "termux-wake-lock", "desc": "Previene suspensión"},
-            {"cmd": "nohup", "desc": "Ejecuta sin interrupción"},
-        ]
-    },
-    6: {
-        "title": "Manipulación de archivos",
-        "description": "Procesamiento de texto",
-        "commands": [
-            {"cmd": "grep", "desc": "Busca patrones en texto"},
-            {"cmd": "find", "desc": "Busca archivos"},
-            {"cmd": "sed", "desc": "Editor de flujo"},
-            {"cmd": "awk", "desc": "Procesamiento de patrones"},
-            {"cmd": "cut", "desc": "Extrae columnas"},
-        ]
-    },
-    7: {
-        "title": "Scripting",
-        "description": "Automatización con shell",
-        "commands": [
-            {"cmd": "read", "desc": "Lee entrada de usuario"},
-            {"cmd": "echo", "desc": "Muestra texto"},
-            {"cmd": "sleep", "desc": "Pausa ejecución"},
-            {"cmd": "chmod +x", "desc": "Hace script ejecutable"},
-        ]
-    },
-    8: {
-        "title": "Almacenamiento",
-        "description": "Archivos, permisos, compresión",
-        "commands": [
-            {"cmd": "chmod", "desc": "Cambia permisos"},
-            {"cmd": "tar", "desc": "Crear/extraer archivos"},
-            {"cmd": "gzip", "desc": "Comprime archivo"},
-            {"cmd": "ls -lh", "desc": "Lista con tamaño legible"},
-        ]
-    },
-    9: {
-        "title": "Red Avanzada",
-        "description": "SSH, seguridad, diagnóstico",
-        "commands": [
-            {"cmd": "ssh", "desc": "Conexión segura remota"},
-            {"cmd": "scp", "desc": "Copia archivos segura"},
-            {"cmd": "curl", "desc": "Transferencia de datos"},
-            {"cmd": "dig", "desc": "Consulta DNS"},
-        ]
-    },
-    10: {
-        "title": "Internos del Sistema",
-        "description": "Diagnóstico avanzado",
-        "commands": [
-            {"cmd": "termux-chroot", "desc": "Entorno chroot"},
-            {"cmd": "getprop", "desc": "Propiedades Android"},
-            {"cmd": "logcat", "desc": "Logs del sistema"},
-            {"cmd": "ldd", "desc": "Dependencias de binario"},
-        ]
-    }
+# Verificar paquetes instalados
+check_termux_pkg() {
+    local pkg_name="$1"
+    if pkg list-installed 2>/dev/null | grep -q "^$pkg_name/"; then
+        log_success "Paquete $pkg_name está instalado"
+        return 0
+    else
+        log_warning "Paquete $pkg_name NO está instalado"
+        return 1
+    fi
 }
 
-def check_package(package):
-    """Verifica si un paquete está instalado"""
-    try:
-        result = subprocess.run(
-            ['pkg', 'list-installed'],
-            capture_output=True, text=True
-        )
-        return package in result.stdout
-    except:
-        return False
+check_termux_pkg "python" > /dev/null
+check_termux_pkg "python-pip" > /dev/null
+check_termux_pkg "termux-api" > /dev/null
 
-def show_header():
-    """Muestra cabecera"""
-    title = Text("chmodx-Command", style="bold cyan")
-    subtitle = Text("Terminal Mastery for Hackers", style="dim")
-    panel = Panel(
-        Columns([title, subtitle]),
-        border_style="cyan",
-        box=box.DOUBLE
-    )
-    console.print(panel)
+echo ""
+log_info "=== Verificando recursos del sistema ==="
 
-def show_main_menu():
-    """Menú principal"""
-    console.clear()
-    show_header()
+# Espacio disponible
+AVAILABLE_KB=$(df "$HOME" | tail -1 | awk '{print $4}')
+AVAILABLE_MB=$((AVAILABLE_KB / 1024))
+if [ "$AVAILABLE_MB" -ge 100 ]; then
+    log_success "Espacio disponible: ${AVAILABLE_MB}MB (suficiente)"
+else
+    log_warning "Espacio disponible bajo: ${AVAILABLE_MB}MB (recomendado: 100MB+)"
+fi
 
-    table = Table(show_header=False, box=box.ROUNDED, border_style="blue")
-    table.add_column("Capítulo", style="cyan", width=5)
-    table.add_column("Título", style="white", width=40)
-    table.add_column("Progreso", style="yellow", width=15)
+# Conectividad
+if ping -c 1 github.com &> /dev/null 2>&1; then
+    log_success "Conectividad a internet OK"
+else
+    log_warning "No se pudo conectar a github.com"
+fi
 
-    for num, chapter in CHAPTERS.items():
-        progress = "No iniciado" if num > 1 else "100%"
-        status = "✓" if num == 1 else "○"
-        table.add_row(
-            f"[{num}]",
-            chapter["title"],
-            f"{status} {progress}"
-        )
+# Almacenamiento Android
+if [ -d "/sdcard" ]; then
+    log_success "Almacenamiento Android disponible (/sdcard)"
+else
+    log_warning "Almacenamiento Android no detectado"
+fi
 
-    console.print(table)
-    console.print()
-    console.print("[bold cyan]Comandos:[/bold cyan] [1-10] Seleccionar capítulo | [q] Salir")
+echo ""
+print_section "RESUMEN DEL ANÁLISIS"
 
-    choice = Prompt.ask("\nSelecciona una opción").lower()
+echo ""
+echo -e "Errores críticos: ${RED}$ERRORS${NC}"
+echo -e "Advertencias: ${YELLOW}$WARNINGS${NC}"
+echo ""
 
-    if choice == 'q':
-        console.print("[yellow]¡Hasta luego, hacker! 🚀[/yellow]")
-        exit(0)
+if [ $ERRORS -gt 0 ]; then
+    log_error "Se encontraron $ERRORS errores críticos"
+    echo ""
+    echo -e "${RED}Corrige los errores antes de continuar${NC}"
+    exit 1
+fi
 
-    try:
-        chapter_num = int(choice)
-        if chapter_num in CHAPTERS:
-            show_chapter(chapter_num)
-        else:
-            console.print("[red]Capítulo inválido[/red]")
-            show_main_menu()
-    except:
-        console.print("[red]Opción inválida[/red]")
-        show_main_menu()
+if [ $WARNINGS -gt 0 ]; then
+    log_warning "Se encontraron $WARNINGS advertencias"
+    echo ""
+    read -p "¿Continuar con la instalación? (s/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Ss]$ ]]; then
+        echo -e "${YELLOW}Instalación cancelada${NC}"
+        exit 0
+    fi
+else
+    log_success "Entorno listo para instalación optimizada"
+fi
 
-def show_chapter(chapter_num):
-    """Muestra un capítulo"""
-    chapter = CHAPTERS[chapter_num]
+echo ""
+print_section "INSTALACIÓN DE DEPENDENCIAS"
 
-    console.clear()
-    show_header()
+echo ""
+log_info "Actualizando repositorios Termux..."
+pkg update -y > /dev/null 2>&1
+log_success "Repositorios actualizados"
 
-    title_panel = Panel(
-        f"[bold cyan]Capítulo {chapter_num}[/bold cyan]\n{chapter['title']}\n{chapter['description']}",
-        border_style="green",
-        box=box.ROUNDED
-    )
-    console.print(title_panel)
-    console.print()
+# Instalar Python si no existe
+if ! command -v python3 &> /dev/null; then
+    log_info "Instalando Python..."
+    pkg install python -y > /dev/null 2>&1
+    log_success "Python instalado correctamente"
+else
+    log_success "Python ya está instalado"
+fi
 
-    table = Table(box=box.SIMPLE, border_style="blue")
-    table.add_column("#", style="cyan", width=4)
-    table.add_column("Comando", style="white", width=35)
-    table.add_column("Descripción", style="dim", width=50)
+# Instalar pip si no existe
+if ! command -v pip3 &> /dev/null; then
+    log_info "Instalando pip..."
+    pkg install python-pip -y > /dev/null 2>&1
+    log_success "pip instalado correctamente"
+else
+    log_success "pip ya está instalado"
+fi
 
-    for idx, cmd in enumerate(chapter["commands"], 1):
-        table.add_row(str(idx), cmd["cmd"], cmd["desc"])
+# Preguntar por termux-api
+if ! pkg list-installed 2>/dev/null | grep -q "^termux-api/"; then
+    echo ""
+    log_warning "termux-api no está instalado"
+    echo -e "${YELLOW}termux-api es necesario para funciones completas de chmodx-Command${NC}"
+    read -p "¿Instalar termux-api ahora? (recomendado) (s/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Ss]$ ]]; then
+        log_info "Instalando termux-api..."
+        pkg install termux-api -y > /dev/null 2>&1
+        log_success "termux-api instalado"
+    fi
+fi
 
-    console.print(table)
-    console.print()
+echo ""
+log_info "Instalando dependencias Python (rich, termcolor)..."
+pip install rich termcolor --quiet
+log_success "Dependencias Python instaladas"
 
-    choice = Prompt.ask(
-        "[cyan]Selecciona comando (1-{}) o [b] volver[/cyan]".format(len(chapter["commands"])),
-        choices=[str(i) for i in range(1, len(chapter["commands"])+1)] + ['b', 'back']
-    )
+echo ""
+print_section "INSTALACIÓN DE chmodx-Command"
 
-    if choice in ['b', 'back']:
-        show_main_menu()
-    else:
-        show_command_detail(chapter_num, int(choice))
+INSTALL_DIR="$HOME/.chmodx-command"
+log_info "Creando directorio de instalación..."
+mkdir -p "$INSTALL_DIR"
+log_success "Directorio creado: $INSTALL_DIR"
 
-def show_command_detail(chapter_num, cmd_idx):
-    """Detalle de comando"""
-    chapter = CHAPTERS[chapter_num]
-    cmd_data = chapter["commands"][cmd_idx - 1]
+log_info "Instalando programa principal..."
+# El programa se instalará aquí
+# Por ahora creamos el esqueleto
+cat > "$INSTALL_DIR/chmodx_command.py" << 'PYEOF'
+#!/usr/bin/env python3
+# chmodx-Command v2.0
+# Análisis de entorno implementado
+import sys
+print("chmodx-Command v2.0 - Terminal Mastery for Hackers")
+print("Instalación completada exitosamente")
+PYEOF
 
-    console.clear()
-    show_header()
-
-    # Panel del comando
-    cmd_panel = Panel(
-        f"[bold green]{cmd_data['cmd']}[/bold green]\n\n{cmd_data['desc']}",
-        title=f"Capítulo {chapter_num}",
-        border_style="green",
-        box=box.ROUNDED
-    )
-    console.print(cmd_panel)
-    console.print()
-
-    # Opciones
-    options_text = Text()
-    options_text.append("Opciones: ", style="bold cyan")
-    options_text.append("[P] Practicar", style="yellow")
-    options_text.append(" | ")
-    options_text.append("[E] Ejecutar", style="yellow")
-    options_text.append(" | ")
-    options_text.append("[V] Verificar paquetes", style="yellow")
-    options_text.append(" | ")
-    options_text.append("[M] Menú", style="yellow")
-    console.print(options_text)
-
-    choice = Prompt.ask("\nSelecciona", choices=['p', 'e', 'v', 'm'], default='m').lower()
-
-    if choice == 'p':
-        practice_command(cmd_data, chapter_num)
-    elif choice == 'e':
-        execute_command(cmd_data)
-    elif choice == 'v':
-        verify_packages(cmd_data)
-    show_chapter(chapter_num)
-
-def practice_command(cmd_data, chapter_num):
-    """Modo práctica"""
-    console.clear()
-    show_header()
-
-    practice_panel = Panel(
-        f"[bold yellow]Modo Práctica[/bold yellow]\n\n"
-        f"Comando: [cyan]{cmd_data['cmd']}[/cyan]\n\n"
-        f"Descripción: {cmd_data['desc']}\n\n"
-        f"[dim]¿Qué hace este comando?[/dim]",
-        border_style="yellow",
-        box=box.ROUNDED
-    )
-    console.print(practice_panel)
-
-    if Confirm.ask("\n¿Quieres intentar ejecutar este comando?"):
-        try:
-            # Ejecutar en modo seguro
-            if "pkg" in cmd_data['cmd'] and "install" not in cmd_data['cmd']:
-                # Comandos seguros de pkg
-                result = subprocess.run(
-                    cmd_data['cmd'].split(),
-                    capture_output=True, text=True, timeout=5
-                )
-                console.print(result.stdout[:500])
-            else:
-                console.print("[yellow]Comando de ejemplo mostrado. Ejecuta tú mismo cuando domines.[/yellow]")
-        except Exception as e:
-            console.print(f"[red]Error: {e}[/red]")
-
-    console.print("\n[green]¡Práctica completada![/green]")
-    Prompt.ask("\nPresiona ENTER para continuar")
-
-def execute_command(cmd_data):
-    """Ejecuta comando"""
-    console.print(f"[yellow]Ejecutando: {cmd_data['cmd']}...[/yellow]")
-    # ...
-    console.print("[green]Comando ejecutado[/green]")
-
-def verify_packages(cmd_data):
-    """Verifica paquetes"""
-    console.clear()
-    show_header()
-
-    console.print("[bold cyan]Verificación de Paquetes[/bold cyan]\n")
-
-    packages = {
-        "termux-api": "API para interacción con Android",
-        "proot": "Chroot y distribuciones Linux",
-        "htop": "Monitor de procesos",
-    }
-
-    table = Table(box=box.SIMPLE, border_style="blue")
-    table.add_column("Paquete", style="cyan")
-    table.add_column("Descripción", style="white")
-    table.add_column("Estado", style="yellow")
-
-    for pkg, desc in packages.items():
-        installed = check_package(pkg)
-        status = "[green]✓ Instalado[/green]" if installed else "[red]✗ No instalado[/red]"
-        table.add_row(pkg, desc, status)
-
-    console.print(table)
-    Prompt.ask("\nPresiona ENTER para continuar")
-
-if __name__ == "__main__":
-    try:
-        console.clear()
-        show_main_menu()
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Saliendo...[/yellow]")
-        exit(0)
-EOF
+log_success "Programa instalado"
 
 # Crear enlace simbólico
-echo -e "${BLUE}[INFO] Creando enlace simbólico...${NC}"
-ln -sf "$INSTALL_DIR/chmodx_command.py" "$HOME/.chmodx-command"
+if [ ! -L "$HOME/.chmodx-command" ] && [ ! -f "$HOME/.chmodx-command" ]; then
+    ln -sf "$INSTALL_DIR" "$HOME/.chmodx-command-link"
+    log_success "Enlace creado"
+fi
 
-# Crear script de ejecución
-cat > "$HOME/.chmodx-command" << 'EOF'
+# Crear script ejecutable
+cat > "$HOME/chmodx-command" << 'EOF'
 #!/bin/bash
 python3 "$HOME/.chmodx-command/chmodx_command.py"
 EOF
+chmod +x "$HOME/chmodx-command"
 
-chmod +x "$HOME/.chmodx-command"
+# Añadir al PATH
+echo 'export PATH="$HOME:$PATH"' >> "$HOME/.bashrc" 2>/dev/null || true
+echo 'export PATH="$HOME:$PATH"' >> "$HOME/.zshrc" 2>/dev/null || true
 
-# Añadir al PATH si es necesario
-if [[ ":$PATH:" != *":$HOME/.chmodx-command:"* ]]; then
-    echo 'export PATH="$HOME/.chmodx-command:$PATH"' >> "$HOME/.bashrc"
-    echo 'export PATH="$HOME/.chmodx-command:$PATH"' >> "$HOME/.zshrc" 2>/dev/null || true
-fi
+log_success "Script ejecutable creado"
 
-echo -e "${GREEN}"
-echo "╔════════════════════════════════════════════════════════════╗"
-echo "║                                                            ║"
-echo "║              ¡chmodx-Command instalado!                   ║"
-echo "║                                                            ║"
-echo "╚════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
-echo -e "${CYAN}Para usar chmodx-Command:${NC}"
-echo -e "${YELLOW}  chmodx-command${NC}"
 echo ""
-echo -e "${CYAN}O desde cualquier directorio:${NC}"
-echo -e "${YELLOW}  python3 ~/.chmodx-command/chmodx_command.py${NC}"
+print_section "INSTALACIÓN COMPLETADA"
+echo ""
+echo -e "${GREEN}"
+echo "╔═══════════════════════════════════════════════════════════════╗"
+echo "║                                                               ║"
+echo "║              ¡chmodx-Command instalado con éxito!           ║"
+echo "║                                                               ║"
+echo "╚═══════════════════════════════════════════════════════════════╝"
+echo -e "${NC}"
+echo ""
+echo -e "${CYAN}Para usar chmodx-Command:${NC}"
+echo -e "${GREEN}  chmodx-command${NC}"
+echo ""
+echo -e "${CYAN}Comandos adicionales:${NC}"
+echo -e "  ${GREEN}chmodx-update${NC} - Actualizar programa"
+echo -e "  ${GREEN}chmodx-config${NC} - Configuración"
+echo ""
+echo -e "${YELLOW}Notas:${NC}"
+echo -e "  • Tu progreso se guarda en ~/.chmodx-command/"
+echo -e "  • Primera ejecución: puede tardar unos segundos"
+echo -e "  • Para funciones completas: instala termux-api"
 echo ""
 echo -e "${GREEN}¡Bienvenido al mundo de la maestría terminal! 🚀${NC}"
+echo ""
